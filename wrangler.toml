@@ -1,0 +1,59 @@
+name = "clg-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[build]
+command = "npm run build"
+
+# Production environment
+[env.production]
+name = "clg-mcp"
+kv_namespaces = [
+  { binding = "CACHE", id = "your-kv-namespace-id" }
+]
+
+[env.production.vars]
+CACHE_ENABLED = "true"
+RATE_LIMIT_ENABLED = "true"
+DEBUG_MODE = "false"
+ENVIRONMENT = "production"
+MCP_SERVER_NAME = "clg-mcp"
+MCP_SERVER_VERSION = "1.0.0"
+
+# Development environment
+[env.development]
+name = "clg-mcp-dev"
+kv_namespaces = [
+  { binding = "CACHE", preview_id = "your-kv-preview-id" }
+]
+
+[env.development.vars]
+CACHE_ENABLED = "true"
+RATE_LIMIT_ENABLED = "false"
+DEBUG_MODE = "true"
+ENVIRONMENT = "development"
+MCP_SERVER_NAME = "clg-mcp-dev"
+MCP_SERVER_VERSION = "1.0.0"
+
+# Free tier limits
+[limits]
+cpu_ms = 10
+
+# Scheduled tasks for cache warming
+[triggers]
+crons = ["0 0 * * *"] # Daily cache warming at midnight UTC
+
+# Global variables (default/fallback)
+[vars]
+CACHE_ENABLED = "true"
+RATE_LIMIT_ENABLED = "true"
+DEBUG_MODE = "false"
+REQUEST_TIMEOUT = "30000"
+MAX_SEARCH_RESULTS = "50"
+RATE_LIMIT_REQUESTS_PER_MINUTE = "30"
+CACHE_TTL_STATIC = "2592000"    # 30 days
+CACHE_TTL_DYNAMIC = "259200"    # 3 days
+CACHE_TTL_SEARCH = "259200"     # 3 days
+MCP_PROTOCOL_VERSION = "2024-11-05"
+USER_AGENT = "CLG-MCP/1.0.0 (Genealogy Research Tool)"

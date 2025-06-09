@@ -1,0 +1,184 @@
+{
+  "mcpServers": {
+    "clg-mcp": {
+      "command": "node",
+      "args": [],
+      "env": {},
+      "transport": {
+        "type": "sse",
+        "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev"
+      },
+      "timeout": 30000,
+      "description": "Cyndi's List Genealogy MCP Server - Access genealogy resources and research tools",
+      "capabilities": {
+        "tools": [
+          "search_genealogy_resources",
+          "browse_categories", 
+          "get_resource_details",
+          "filter_resources",
+          "get_location_resources"
+        ],
+        "resources": []
+      }
+    }
+  },
+  "examples": {
+    "claude_desktop": {
+      "description": "Configuration for Claude Desktop application",
+      "config_location": "~/Library/Application Support/Claude/claude_desktop_config.json",
+      "example": {
+        "mcpServers": {
+          "clg-mcp": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-everything"],
+            "env": {
+              "MCP_SERVER_URL": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev"
+            }
+          }
+        }
+      }
+    },
+    "cline_vscode": {
+      "description": "Configuration for Cline VS Code extension",
+      "config_location": "VS Code Settings > Extensions > Cline > MCP Servers",
+      "example": {
+        "clg-mcp": {
+          "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev",
+          "type": "sse",
+          "name": "Cyndi's List Genealogy"
+        }
+      }
+    },
+    "custom_client": {
+      "description": "Direct HTTP/SSE connection for custom clients",
+      "connection": {
+        "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "initialization": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "initialize",
+          "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {
+              "name": "your-client-name",
+              "version": "1.0.0"
+            }
+          }
+        }
+      }
+    }
+  },
+  "deployment_instructions": {
+    "steps": [
+      "1. Deploy your CLG-MCP server to Cloudflare Workers",
+      "2. Replace 'YOUR_SUBDOMAIN' with your actual Cloudflare subdomain",
+      "3. Update the URL in your MCP client configuration",
+      "4. Test the connection using: npm run test:connection",
+      "5. Configure your MCP client with the updated configuration"
+    ],
+    "notes": [
+      "The server URL format is: https://WORKER_NAME.YOUR_SUBDOMAIN.workers.dev",
+      "You can find your subdomain in the Cloudflare Workers dashboard",
+      "Custom domains can be used if configured in Cloudflare"
+    ]
+  },
+  "usage_examples": {
+    "search_resources": {
+      "description": "Search for genealogy resources",
+      "tool": "search_genealogy_resources",
+      "examples": [
+        {
+          "query": "Find birth records for Smith family in Ohio",
+          "parameters": {
+            "query": "Smith family birth records",
+            "location": "Ohio",
+            "resourceType": "birth records",
+            "maxResults": 20
+          }
+        },
+        {
+          "query": "Find immigration records from Ireland to United States",
+          "parameters": {
+            "query": "immigration records Ireland",
+            "location": "United States",
+            "timePeriod": {
+              "startYear": 1800,
+              "endYear": 1900
+            }
+          }
+        }
+      ]
+    },
+    "browse_categories": {
+      "description": "Browse genealogy resource categories",
+      "tool": "browse_categories",
+      "examples": [
+        {
+          "query": "Show all main categories",
+          "parameters": {
+            "includeCount": true
+          }
+        },
+        {
+          "query": "Show subcategories for births and baptisms",
+          "parameters": {
+            "parentCategory": "births",
+            "includeCount": true
+          }
+        }
+      ]
+    },
+    "location_resources": {
+      "description": "Get resources for specific locations",
+      "tool": "get_location_resources",
+      "examples": [
+        {
+          "query": "Find resources for genealogy research in County Cork, Ireland",
+          "parameters": {
+            "country": "Ireland",
+            "county": "Cork"
+          }
+        },
+        {
+          "query": "Find US state-level resources for Pennsylvania",
+          "parameters": {
+            "country": "United States",
+            "state": "Pennsylvania"
+          }
+        }
+      ]
+    }
+  },
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "issue": "Connection timeout",
+        "solution": "Check if the worker URL is correct and the server is deployed"
+      },
+      {
+        "issue": "Rate limiting errors",
+        "solution": "Reduce request frequency - server has 30 requests/minute limit"
+      },
+      {
+        "issue": "Tool not found errors", 
+        "solution": "Ensure you're using the correct tool names listed in capabilities"
+      },
+      {
+        "issue": "Invalid response format",
+        "solution": "Check that your MCP client supports the 2024-11-05 protocol version"
+      }
+    ],
+    "debugging": [
+      "Use 'npm run test:connection' to verify server connectivity",
+      "Check Cloudflare Workers logs for server-side errors",
+      "Verify KV namespace is properly configured in wrangler.toml",
+      "Test with curl commands to isolate client vs server issues"
+    ]
+  }
+}

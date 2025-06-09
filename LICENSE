@@ -1,0 +1,60 @@
+MIT License
+
+Copyright (c) 2024 CLG-MCP: Cyndi's List Genealogy MCP Server
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+THIRD-PARTY NOTICES
+
+This software includes or references third-party software subject to the following licenses:
+
+1. @modelcontextprotocol/sdk
+   - License: MIT
+   - Copyright: Anthropic
+
+2. TypeScript
+   - License: Apache-2.0
+   - Copyright: Microsoft Corporation
+
+3. Cloudflare Workers Runtime
+   - License: Various (see Cloudflare documentation)
+   - Copyright: Cloudflare, Inc.
+
+DISCLAIMER REGARDING CYNDI'S LIST
+
+This software is an independent tool that interacts with publicly available content
+from Cyndi's List (https://cyndislist.com). This project is not affiliated with,
+endorsed by, or officially connected to Cyndi's List or its operators.
+
+Users of this software are responsible for:
+- Complying with Cyndi's List's terms of service
+- Implementing appropriate request delays and rate limiting
+- Using the software for legitimate genealogical research purposes only
+- Respecting the intellectual property rights of content creators
+
+The developers of this software:
+- Do not guarantee the accuracy or completeness of scraped data
+- Are not responsible for any violations of third-party terms of service
+- Recommend users verify information through original sources
+- Encourage supporting the original content creators and Cyndi's List
+
+This tool is intended for educational and research purposes in the field of genealogy.
+Commercial use may require additional permissions from relevant parties.
