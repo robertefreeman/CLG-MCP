@@ -5,7 +5,7 @@
       "args": [],
       "env": {},
       "transport": {
-        "type": "sse",
+        "type": "http",
         "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev"
       },
       "timeout": 30000,
@@ -33,6 +33,10 @@
             "args": ["-y", "@modelcontextprotocol/server-everything"],
             "env": {
               "MCP_SERVER_URL": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev"
+            },
+            "transport": {
+              "type": "http",
+              "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev"
             }
           }
         }
@@ -44,13 +48,13 @@
       "example": {
         "clg-mcp": {
           "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev",
-          "type": "sse",
+          "type": "http",
           "name": "Cyndi's List Genealogy"
         }
       }
     },
     "custom_client": {
-      "description": "Direct HTTP/SSE connection for custom clients",
+      "description": "Direct HTTP connection for custom clients",
       "connection": {
         "url": "https://clg-mcp.YOUR_SUBDOMAIN.workers.dev",
         "method": "POST",
@@ -85,7 +89,8 @@
     "notes": [
       "The server URL format is: https://WORKER_NAME.YOUR_SUBDOMAIN.workers.dev",
       "You can find your subdomain in the Cloudflare Workers dashboard",
-      "Custom domains can be used if configured in Cloudflare"
+      "Custom domains can be used if configured in Cloudflare",
+      "This version uses HTTP streaming instead of SSE for better compatibility"
     ]
   },
   "usage_examples": {
@@ -155,15 +160,24 @@
       ]
     }
   },
+  "architecture_notes": {
+    "transport": "HTTP Streaming",
+    "caching": "None - Direct HTTP requests every time",
+    "rate_limiting": "None - Built-in respectful delays only",
+    "deployment": "Cloudflare Workers (no KV required)",
+    "benefits": [
+      "Simplified deployment without KV namespace setup",
+      "Better client compatibility with HTTP transport",
+      "Cleaner codebase without caching complexity",
+      "Respectful scraping with built-in delays",
+      "Direct error handling and responses"
+    ]
+  },
   "troubleshooting": {
     "common_issues": [
       {
         "issue": "Connection timeout",
         "solution": "Check if the worker URL is correct and the server is deployed"
-      },
-      {
-        "issue": "Rate limiting errors",
-        "solution": "Reduce request frequency - server has 30 requests/minute limit"
       },
       {
         "issue": "Tool not found errors", 
@@ -172,13 +186,17 @@
       {
         "issue": "Invalid response format",
         "solution": "Check that your MCP client supports the 2024-11-05 protocol version"
+      },
+      {
+        "issue": "Transport type errors",
+        "solution": "Ensure your client is configured for HTTP transport, not SSE"
       }
     ],
     "debugging": [
       "Use 'npm run test:connection' to verify server connectivity",
       "Check Cloudflare Workers logs for server-side errors",
-      "Verify KV namespace is properly configured in wrangler.toml",
-      "Test with curl commands to isolate client vs server issues"
+      "Test with curl commands to isolate client vs server issues",
+      "Verify HTTP transport type in client configuration"
     ]
   }
 }

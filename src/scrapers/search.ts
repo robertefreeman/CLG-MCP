@@ -13,41 +13,36 @@ export async function searchResources(
 }
 
 class SearchScraper extends BaseScraper {
-  async search(query: string, filters: any): Promise<SearchResult> {
+  async search(query: string, _filters: any): Promise<SearchResult> {
     if (!query || query.trim().length === 0) {
       throw new ScraperError('Search query cannot be empty', ERROR_CODES.INVALID_INPUT, false);
     }
     
-    const cacheKey = `srch:${this.hashString(query)}:${this.hashString(JSON.stringify(filters))}`;
-    const ttl = 3 * 24 * 60 * 60; // 3 days
+    await this.delay(1000); // Respectful delay
     
-    return this.fetchWithCache(cacheKey, ttl, async () => {
-      await this.delay(1000); // Respectful delay
+    try {
+      // Construct search URL - Cyndi's List uses a simple search parameter
+      const searchUrl = `${this.baseUrl}/search/?q=${encodeURIComponent(query.trim())}`;
+      const response = await this.fetchPage(searchUrl);
+      const html = await response.text();
       
-      try {
-        // Construct search URL - Cyndi's List uses a simple search parameter
-        const searchUrl = `${this.baseUrl}/search/?q=${encodeURIComponent(query.trim())}`;
-        const response = await this.fetchPage(searchUrl);
-        const html = await response.text();
-        
-        const resources = await this.parseSearchResults(html, query);
-        
-        return {
-          resources,
-          totalCount: resources.length,
-          page: 1,
-          pageSize: 20,
-        };
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new ScraperError(
-            `Failed to search Cyndi's List: ${error.message}`,
-            ERROR_CODES.NETWORK_ERROR
-          );
-        }
-        throw error;
+      const resources = await this.parseSearchResults(html, query);
+      
+      return {
+        resources,
+        totalCount: resources.length,
+        page: 1,
+        pageSize: 20,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new ScraperError(
+          `Failed to search Cyndi's List: ${error.message}`,
+          ERROR_CODES.NETWORK_ERROR
+        );
       }
-    });
+      throw error;
+    }
   }
   
   private async parseSearchResults(html: string, query: string): Promise<GenealogyResource[]> {
@@ -275,14 +270,4 @@ class SearchScraper extends BaseScraper {
     });
   }
   
-  private hashString(str: string): string {
-    // Simple hash function for cache keys
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36);
-  }
 }

@@ -1,12 +1,16 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { MCPRequest, MCPResponse, MCPError, Env } from './types';
-import { MCPServer } from './mcp/server';
-import { handleToolCall } from './mcp/tools';
-import { KVRateLimiter } from './rateLimit/kvLimiter';
+import { MCPRequest, MCPResponse, Env, MCPTool } from './types';
+import {
+  handleSearchResources as searchResourcesTool,
+  handleBrowseCategories as browseCategoriesTool,
+  handleGetResourceDetails as getResourceDetailsTool,
+  handleFilterResources as filterResourcesTool,
+  handleGetLocationResources as getLocationResourcesTool
+} from './mcp/tools';
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -44,6 +48,7 @@ export default {
           version: '1.0.0',
           description: 'A Model Context Protocol server for genealogy resource discovery',
           protocol: 'MCP 2024-11-05',
+          transport: 'HTTP Streaming',
           endpoints: {
             health: '/health',
             mcp: '/ (POST with MCP JSON-RPC)'
@@ -65,102 +70,89 @@ export default {
       return new Response('Method not allowed', { status: 405 });
     }
 
-    // Set up SSE response headers
+    // Set up HTTP streaming response headers
     const headers = new Headers({
-      'Content-Type': 'text/event-stream',
+      'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
     });
 
-    // Create a TransformStream for SSE
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-
-    // Handle the request asynchronously
-    ctx.waitUntil(handleMCPRequest(request, env, writer, encoder));
-
-    return new Response(readable, { headers });
+    // Handle the request and return direct JSON response
+    try {
+      const response = await handleMCPRequest(request, env);
+      return new Response(JSON.stringify(response), { 
+        headers,
+        status: 200 
+      });
+    } catch (error) {
+      const errorResponse: MCPResponse = {
+        jsonrpc: '2.0',
+        id: 0,
+        error: {
+          code: -32603,
+          message: 'Internal server error',
+        },
+      };
+      
+      return new Response(JSON.stringify(errorResponse), { 
+        headers,
+        status: 500 
+      });
+    }
   },
 
-  // Handle cron trigger for cache warming
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    // TODO: Implement cache warming logic
-    console.log('Cache warming triggered at', new Date(event.scheduledTime).toISOString());
-  },
+  // Remove cron trigger for cache warming since we no longer use caching
 };
 
 async function handleMCPRequest(
   request: Request,
-  env: Env,
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder
-): Promise<void> {
+  env: Env
+): Promise<MCPResponse> {
+  // Parse the request body
+  const body = await request.text();
+  let mcpRequest: MCPRequest;
+  
   try {
-    // Check rate limiting
-    const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const rateLimiter = new KVRateLimiter(env);
-    
-    if (env.RATE_LIMIT_ENABLED === 'true') {
-      const allowed = await rateLimiter.checkLimit(clientIp);
-      if (!allowed) {
-        await sendError(writer, encoder, -32000, 'Rate limit exceeded', null);
-        await writer.close();
-        return;
-      }
-    }
-
-    // Parse the request body
-    const body = await request.text();
-    let mcpRequest: MCPRequest;
-    
-    try {
-      mcpRequest = JSON.parse(body);
-    } catch (error) {
-      await sendError(writer, encoder, -32700, 'Parse error', null);
-      await writer.close();
-      return;
-    }
-
-    // Initialize MCP server
-    const mcpServer = new MCPServer(env);
-
-    // Route the request based on method
-    switch (mcpRequest.method) {
-      case 'initialize':
-        await handleInitialize(writer, encoder, mcpRequest);
-        break;
-        
-      case 'initialized':
-        await handleInitialized(writer, encoder, mcpRequest);
-        break;
-        
-      case 'tools/list':
-        await handleToolsList(writer, encoder, mcpRequest, mcpServer);
-        break;
-        
-      case 'tools/call':
-        await handleToolCall(writer, encoder, mcpRequest, env);
-        break;
-        
-      default:
-        await sendError(writer, encoder, -32601, 'Method not found', mcpRequest.id);
-    }
+    mcpRequest = JSON.parse(body);
   } catch (error) {
-    console.error('Error handling MCP request:', error);
-    await sendError(writer, encoder, -32603, 'Internal error', null);
-  } finally {
-    await writer.close();
+    return {
+      jsonrpc: '2.0',
+      id: 0,
+      error: {
+        code: -32700,
+        message: 'Parse error',
+      },
+    };
+  }
+
+  // Route the request based on method
+  switch (mcpRequest.method) {
+    case 'initialize':
+      return handleInitialize(mcpRequest);
+      
+    case 'initialized':
+      return handleInitialized(mcpRequest);
+      
+    case 'tools/list':
+      return handleToolsList(mcpRequest);
+      
+    case 'tools/call':
+      return await handleToolCallWrapper(mcpRequest, env);
+      
+    default:
+      return {
+        jsonrpc: '2.0',
+        id: mcpRequest.id,
+        error: {
+          code: -32601,
+          message: 'Method not found',
+        },
+      };
   }
 }
 
-async function handleInitialize(
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder,
-  request: MCPRequest
-): Promise<void> {
-  const response: MCPResponse = {
+function handleInitialize(request: MCPRequest): MCPResponse {
+  return {
     jsonrpc: '2.0',
     id: request.id,
     result: {
@@ -176,68 +168,210 @@ async function handleInitialize(
       },
     },
   };
-
-  await sendResponse(writer, encoder, response);
 }
 
-async function handleInitialized(
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder,
-  request: MCPRequest
-): Promise<void> {
-  // Just acknowledge the initialized notification
-  const response: MCPResponse = {
+function handleInitialized(request: MCPRequest): MCPResponse {
+  return {
     jsonrpc: '2.0',
     id: request.id,
     result: {},
   };
-
-  await sendResponse(writer, encoder, response);
 }
 
-async function handleToolsList(
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder,
-  request: MCPRequest,
-  mcpServer: MCPServer
-): Promise<void> {
-  const tools = mcpServer.getTools();
+function handleToolsList(request: MCPRequest): MCPResponse {
+  const tools: MCPTool[] = [
+    {
+      name: 'search_genealogy_resources',
+      description: 'Search Cyndi\'s List for genealogy resources by ancestor names, locations, or keywords',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query (names, locations, keywords)',
+          },
+          location: {
+            type: 'string',
+            description: 'Geographic location filter (optional)',
+          },
+          timePeriod: {
+            type: 'object',
+            properties: {
+              start: { type: 'number', description: 'Start year' },
+              end: { type: 'number', description: 'End year' },
+            },
+          },
+          resourceType: {
+            type: 'string',
+            enum: ['census', 'vital_records', 'military', 'immigration',
+                   'newspapers', 'cemeteries', 'church_records', 'all'],
+            description: 'Type of genealogy resource',
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Maximum results to return (default: 20, max: 50)',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'browse_categories',
+      description: 'Browse genealogy resource categories on Cyndi\'s List',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          parentCategory: {
+            type: 'string',
+            description: 'Parent category ID (optional, null for top-level)',
+          },
+          includeCount: {
+            type: 'boolean',
+            description: 'Include resource count per category',
+          },
+        },
+      },
+    },
+    {
+      name: 'get_resource_details',
+      description: 'Get detailed information about a specific genealogy resource',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          resourceId: {
+            type: 'string',
+            description: 'Unique resource identifier',
+          },
+          includeRelated: {
+            type: 'boolean',
+            description: 'Include related resources',
+          },
+        },
+        required: ['resourceId'],
+      },
+    },
+    {
+      name: 'filter_resources',
+      description: 'Filter genealogy resources by multiple criteria',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          categories: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Category IDs to filter by',
+          },
+          locations: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Geographic locations',
+          },
+          languages: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Resource languages',
+          },
+          freeOnly: {
+            type: 'boolean',
+            description: 'Only show free resources',
+          },
+          hasDigitalRecords: {
+            type: 'boolean',
+            description: 'Only show resources with digital records',
+          },
+        },
+      },
+    },
+    {
+      name: 'get_location_resources',
+      description: 'Get genealogy resources for a specific location',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          country: {
+            type: 'string',
+            description: 'Country name',
+          },
+          state: {
+            type: 'string',
+            description: 'State/Province name (optional)',
+          },
+          county: {
+            type: 'string',
+            description: 'County name (optional)',
+          },
+          city: {
+            type: 'string',
+            description: 'City name (optional)',
+          },
+        },
+        required: ['country'],
+      },
+    },
+  ];
   
-  const response: MCPResponse = {
+  return {
     jsonrpc: '2.0',
     id: request.id,
     result: {
       tools,
     },
   };
-
-  await sendResponse(writer, encoder, response);
 }
 
-async function sendResponse(
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder,
-  response: MCPResponse
-): Promise<void> {
-  const data = `data: ${JSON.stringify(response)}\n\n`;
-  await writer.write(encoder.encode(data));
-}
+async function handleToolCallWrapper(request: MCPRequest, env: Env): Promise<MCPResponse> {
+  const { name, arguments: args } = request.params;
 
-async function sendError(
-  writer: WritableStreamDefaultWriter,
-  encoder: TextEncoder,
-  code: number,
-  message: string,
-  id: string | number | null
-): Promise<void> {
-  const response: MCPResponse = {
-    jsonrpc: '2.0',
-    id: id || 0,
-    error: {
-      code,
-      message,
-    },
-  };
+  try {
+    let result: any;
 
-  await sendResponse(writer, encoder, response);
+    switch (name) {
+      case 'search_genealogy_resources':
+        result = await searchResourcesTool(args, env);
+        break;
+
+      case 'browse_categories':
+        result = await browseCategoriesTool(args, env);
+        break;
+
+      case 'get_resource_details':
+        result = await getResourceDetailsTool(args, env);
+        break;
+
+      case 'filter_resources':
+        result = await filterResourcesTool(args, env);
+        break;
+
+      case 'get_location_resources':
+        result = await getLocationResourcesTool(args, env);
+        break;
+
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+
+    return {
+      jsonrpc: '2.0',
+      id: request.id,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    return {
+      jsonrpc: '2.0',
+      id: request.id,
+      error: {
+        code: -32603,
+        message: `Tool execution failed: ${errorMessage}`,
+      },
+    };
+  }
 }

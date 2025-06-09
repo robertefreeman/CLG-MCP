@@ -1,6 +1,6 @@
 # CLG-MCP: Cyndi's List Genealogy MCP Server
 
-A Model Context Protocol (MCP) server that provides comprehensive genealogy resource discovery capabilities through web scraping of Cyndi's List. This server is designed to run on Cloudflare Workers free tier.
+A simplified Model Context Protocol (MCP) server that provides genealogy resource discovery capabilities through web scraping of Cyndi's List. This server is designed to run on Cloudflare Workers free tier with a clean, cache-free architecture.
 
 ## Features
 
@@ -9,17 +9,17 @@ A Model Context Protocol (MCP) server that provides comprehensive genealogy reso
 - **Resource Details**: Get detailed information about specific genealogy resources
 - **Filter Resources**: Filter resources by multiple criteria (location, type, language, etc.)
 - **Location-based Resources**: Find resources specific to geographic locations
-- **Intelligent Caching**: Aggressive caching strategy optimized for Cloudflare free tier
-- **Rate Limiting**: Built-in rate limiting to stay within API limits
+- **HTTP Streaming**: Modern HTTP streaming transport for better performance
+- **Simplified Architecture**: Clean design without caching or rate limiting complexity
 
 ## Architecture
 
 This MCP server is built with:
 - **TypeScript** for type safety
 - **Cloudflare Workers** for serverless deployment
-- **Cloudflare KV** for caching and rate limiting
-- **SSE (Server-Sent Events)** for MCP protocol communication
+- **HTTP Streaming** for MCP protocol communication
 - **Web Scraping** of Cyndi's List genealogy resources
+- **Respectful delays** to ensure responsible scraping
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ This MCP server is built with:
 
 ### Installation & Deployment
 
-#### Option 1: Automated Deployment (Recommended)
+#### Automated Setup
 
 1. **Clone and setup the repository**
    ```bash
@@ -46,42 +46,8 @@ This MCP server is built with:
    wrangler login
    ```
 
-3. **Deploy with automated script**
+3. **Deploy**
    ```bash
-   npm run deploy:full
-   ```
-   
-   The deployment script will:
-   - Validate your environment
-   - Create KV namespaces automatically
-   - Build and deploy the worker
-   - Verify the deployment
-
-#### Option 2: Manual Deployment
-
-1. **Clone and install**
-   ```bash
-   git clone <repository-url>
-   cd clg-mcp
-   npm install
-   ```
-
-2. **Authenticate with Cloudflare**
-   ```bash
-   wrangler login
-   ```
-
-3. **Create KV namespace**
-   ```bash
-   wrangler kv:namespace create "CACHE"
-   wrangler kv:namespace create "CACHE" --preview
-   ```
-   
-   Update `wrangler.toml` with the returned namespace IDs.
-
-4. **Build and deploy**
-   ```bash
-   npm run build
    npm run deploy
    ```
 
@@ -118,21 +84,14 @@ npm run dev
    - Account ID: Found in the right sidebar of your Cloudflare dashboard
    - Subdomain: Your workers.dev subdomain (format: `your-subdomain.workers.dev`)
 
-3. **Generate API token (optional, for automated deployment)**
-   - Go to [API Tokens](https://dash.cloudflare.com/profile/api-tokens)
-   - Create token with `Workers:Edit` and `Zone:Read` permissions
-   - Copy the token to your `.env` file
-
 ### Free Tier Limits
 
 Cloudflare Workers free tier includes:
 - **100,000 requests/day**
-- **100,000 KV reads/day**
-- **1,000 KV writes/day**
 - **10ms CPU time per request**
 - **10 Workers per account**
 
-This MCP server is optimized to work within these limits.
+This simplified MCP server is optimized to work well within these limits.
 
 ## MCP Client Configuration
 
@@ -148,7 +107,7 @@ Add to your `claude_desktop_config.json`:
       "args": [],
       "env": {},
       "transport": {
-        "type": "sse",
+        "type": "http",
         "url": "https://your-worker-name.your-subdomain.workers.dev"
       }
     }
@@ -167,7 +126,7 @@ Add to your `claude_desktop_config.json`:
 3. Add new server:
    - **Name**: `Cyndi's List Genealogy`
    - **URL**: `https://your-worker-name.your-subdomain.workers.dev`
-   - **Type**: `sse`
+   - **Type**: `http`
 
 ### Custom MCP Clients
 
@@ -273,14 +232,10 @@ clg-mcp/
 │   │   ├── server.ts         # MCP server setup
 │   │   └── tools.ts          # Tool definitions and handlers
 │   ├── scrapers/
-│   │   ├── base.ts           # Base scraper with caching
+│   │   ├── base.ts           # Base scraper with common functionality
 │   │   ├── categories.ts     # Category hierarchy scraper
 │   │   ├── search.ts         # Search functionality
 │   │   └── resources.ts      # Resource details scraper
-│   ├── cache/
-│   │   └── manager.ts        # Cache management
-│   ├── rateLimit/
-│   │   └── kvLimiter.ts      # KV-based rate limiting
 │   ├── utils/
 │   │   ├── errors.ts         # Error handling
 │   │   └── htmlParser.ts     # HTML parsing utilities
@@ -288,8 +243,7 @@ clg-mcp/
 │       └── index.ts          # TypeScript interfaces
 ├── scripts/
 │   ├── deploy.ts             # Automated deployment script
-│   ├── test-connection.ts    # Connection testing script
-│   └── prebuild-cache.ts     # Cache prebuilding script
+│   └── test-connection.ts    # Connection testing script
 ├── wrangler.toml             # Cloudflare Worker config
 ├── package.json
 ├── tsconfig.json
@@ -303,28 +257,29 @@ clg-mcp/
 - `npm run setup` - Install dependencies and build project
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run dev` - Run development server locally
-- `npm run deploy` - Simple deployment using wrangler
-- `npm run deploy:full` - Full automated deployment with validation
-- `npm run deploy:dev` - Deploy to development environment
+- `npm run deploy` - Deploy to Cloudflare Workers
 - `npm run test:connection` - Test server connectivity and functionality
-- `npm run prebuild-cache` - Pre-populate cache with static data
 - `npm run lint` - Check code style and errors
 - `npm run format` - Format code with prettier
 
-## Caching Strategy
+## Simplified Architecture Benefits
 
-The server uses an aggressive caching strategy optimized for Cloudflare's free tier:
+This refactored version provides several advantages:
 
-- **Static content** (categories): 30 days
-- **Semi-static content** (resource details): 14 days  
-- **Dynamic content** (search results): 3 days
-- **Rate limiting**: 1 minute
+- **No KV Dependencies**: Eliminates the need for Cloudflare KV namespace setup
+- **Simplified Deployment**: Easier setup process without cache configuration
+- **HTTP Streaming**: Modern transport protocol for better compatibility
+- **Reduced Complexity**: Cleaner codebase without caching infrastructure
+- **Better Error Handling**: Direct HTTP responses instead of SSE complexity
+- **Respectful Scraping**: Built-in delays ensure responsible website access
 
-## Rate Limiting
+## Responsible Usage
 
-- 30 requests per minute per IP address
-- Graceful degradation when limits are reached
-- Uses Cloudflare KV for distributed rate limiting
+The server includes built-in delays between requests to ensure respectful scraping:
+- Search requests: 1000ms delay
+- Category browsing: 800ms delay  
+- Resource details: 1000ms delay
+- Filter operations: 1200ms delay
 
 ## Troubleshooting
 
@@ -335,19 +290,11 @@ The server uses an aggressive caching strategy optimized for Cloudflare's free t
    - Verify the server is deployed and running
    - Test with `npm run test:connection`
 
-2. **Rate limiting errors**
-   - Reduce request frequency (30 requests/minute limit)
-   - Wait a minute before retrying
-
-3. **Tool not found errors**
+2. **Tool not found errors**
    - Ensure you're using correct tool names
    - Check the available tools list above
 
-4. **KV namespace errors**
-   - Verify KV namespaces are created and configured in `wrangler.toml`
-   - Check namespace IDs match between wrangler.toml and Cloudflare dashboard
-
-5. **Build/deployment failures**
+3. **Build/deployment failures**
    - Run `npm run lint` to check for code issues
    - Ensure you're authenticated with `wrangler login`
    - Check Cloudflare Workers dashboard for error logs
@@ -356,7 +303,6 @@ The server uses an aggressive caching strategy optimized for Cloudflare's free t
 
 - Use `npm run test:connection` to verify server connectivity
 - Check Cloudflare Workers logs with `wrangler tail`
-- Verify KV namespace configuration in wrangler.toml
 - Test with curl commands to isolate client vs server issues:
 
 ```bash
@@ -401,7 +347,7 @@ MIT License - see LICENSE file for details
 
 ## Disclaimer
 
-This tool is for educational and research purposes. Please respect Cyndi's List's terms of service and implement appropriate delays between requests.
+This tool is for educational and research purposes. Please respect Cyndi's List's terms of service and the built-in delays for responsible scraping.
 
 ---
 

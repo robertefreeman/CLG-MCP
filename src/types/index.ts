@@ -96,33 +96,12 @@ export interface FilterCriteria {
 
 // Cloudflare Worker Types
 export interface Env {
-  CACHE: KVNamespace;
-  CACHE_ENABLED: string;
-  RATE_LIMIT_ENABLED: string;
-  DEBUG_MODE: string;
+  DEBUG_MODE?: string;
   ENVIRONMENT?: string;
   MCP_SERVER_NAME?: string;
   MCP_SERVER_VERSION?: string;
   REQUEST_TIMEOUT?: string;
   MAX_SEARCH_RESULTS?: string;
-  RATE_LIMIT_REQUESTS_PER_MINUTE?: string;
-  CACHE_TTL_STATIC?: string;
-  CACHE_TTL_DYNAMIC?: string;
-  CACHE_TTL_SEARCH?: string;
   MCP_PROTOCOL_VERSION?: string;
   USER_AGENT?: string;
-}
-
-// Cache Types
-export interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
-
-// Rate Limiting Types
-export interface RateLimitResult {
-  allowed: boolean;
-  remaining?: number;
-  resetAt?: number;
 }

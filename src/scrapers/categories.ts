@@ -17,38 +17,33 @@ class CategoryScraper extends BaseScraper {
     parentCategory: string | null,
     includeCount: boolean
   ): Promise<{ categories: Category[] }> {
-    const cacheKey = parentCategory ? `cat:${parentCategory}` : 'cat:_list';
-    const ttl = 30 * 24 * 60 * 60; // 30 days for static content
+    await this.delay(800); // Respectful delay
     
-    return this.fetchWithCache(cacheKey, ttl, async () => {
-      await this.delay(800); // Respectful delay
-      
-      try {
-        let url: string;
-        if (parentCategory) {
-          // Navigate to specific category page
-          url = `${this.baseUrl}/${parentCategory}/`;
-        } else {
-          // Get main category page
-          url = `${this.baseUrl}/`;
-        }
-        
-        const response = await this.fetchPage(url);
-        const html = await response.text();
-        
-        const categories = await this.parseCategories(html, parentCategory, includeCount);
-        
-        return { categories };
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new ScraperError(
-            `Failed to fetch categories from Cyndi's List: ${error.message}`,
-            ERROR_CODES.NETWORK_ERROR
-          );
-        }
-        throw error;
+    try {
+      let url: string;
+      if (parentCategory) {
+        // Navigate to specific category page
+        url = `${this.baseUrl}/${parentCategory}/`;
+      } else {
+        // Get main category page
+        url = `${this.baseUrl}/`;
       }
-    });
+      
+      const response = await this.fetchPage(url);
+      const html = await response.text();
+      
+      const categories = await this.parseCategories(html, parentCategory, includeCount);
+      
+      return { categories };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new ScraperError(
+          `Failed to fetch categories from Cyndi's List: ${error.message}`,
+          ERROR_CODES.NETWORK_ERROR
+        );
+      }
+      throw error;
+    }
   }
   
   private async parseCategories(html: string, parentCategory: string | null, includeCount: boolean): Promise<Category[]> {
@@ -344,13 +339,4 @@ class CategoryScraper extends BaseScraper {
     return text.replace(/\s+/g, ' ').trim();
   }
   
-  private hashString(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36);
-  }
 }

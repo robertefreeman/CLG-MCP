@@ -1,8 +1,6 @@
-import { MCPTool, Env } from '../types';
+import { MCPTool } from '../types';
 
 export class MCPServer {
-  constructor(private env: Env) {}
-
   getTools(): MCPTool[] {
     return [
       {

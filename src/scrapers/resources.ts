@@ -34,78 +34,67 @@ export async function getLocationResources(
 class ResourceScraper extends BaseScraper {
   async getDetails(
     resourceId: string,
-    includeRelated: boolean
+    _includeRelated: boolean
   ): Promise<GenealogyResource> {
     if (!resourceId || resourceId.trim().length === 0) {
       throw new ScraperError('Resource ID cannot be empty', ERROR_CODES.INVALID_INPUT, false);
     }
     
-    const cacheKey = `res:${resourceId}`;
-    const ttl = 14 * 24 * 60 * 60; // 14 days
+    await this.delay(1000); // Respectful delay
     
-    return this.fetchWithCache(cacheKey, ttl, async () => {
-      await this.delay(1000); // Respectful delay
-      
-      try {
-        // Try to construct resource URL from ID
-        let resourceUrl: string;
-        if (resourceId.startsWith('http')) {
-          resourceUrl = resourceId;
-        } else {
-          // Assume resourceId is a path or slug
-          resourceUrl = `${this.baseUrl}/${resourceId}`;
-        }
-        
-        const response = await this.fetchPage(resourceUrl);
-        const html = await response.text();
-        
-        const resource = await this.parseResourceDetails(html, resourceUrl, resourceId);
-        
-        return resource;
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new ScraperError(
-            `Failed to fetch resource details: ${error.message}`,
-            ERROR_CODES.NETWORK_ERROR
-          );
-        }
-        throw error;
+    try {
+      // Try to construct resource URL from ID
+      let resourceUrl: string;
+      if (resourceId.startsWith('http')) {
+        resourceUrl = resourceId;
+      } else {
+        // Assume resourceId is a path or slug
+        resourceUrl = `${this.baseUrl}/${resourceId}`;
       }
-    });
+      
+      const response = await this.fetchPage(resourceUrl);
+      const html = await response.text();
+      
+      const resource = await this.parseResourceDetails(html, resourceUrl, resourceId);
+      
+      return resource;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new ScraperError(
+          `Failed to fetch resource details: ${error.message}`,
+          ERROR_CODES.NETWORK_ERROR
+        );
+      }
+      throw error;
+    }
   }
   
   async filter(
     criteria: FilterCriteria
   ): Promise<{ resources: GenealogyResource[]; totalCount: number }> {
-    const cacheKey = `filter:${this.hashObject(criteria)}`;
-    const ttl = 7 * 24 * 60 * 60; // 7 days
+    await this.delay(1200); // Respectful delay
     
-    return this.fetchWithCache(cacheKey, ttl, async () => {
-      await this.delay(1200); // Respectful delay
+    try {
+      // Build search URL based on criteria
+      const searchParams = this.buildSearchParams(criteria);
+      const searchUrl = `${this.baseUrl}/search/?${searchParams}`;
       
-      try {
-        // Build search URL based on criteria
-        const searchParams = this.buildSearchParams(criteria);
-        const searchUrl = `${this.baseUrl}/search/?${searchParams}`;
-        
-        const response = await this.fetchPage(searchUrl);
-        const html = await response.text();
-        
-        const filteredResources = await this.parseFilteredResources(html, criteria);
-        
-        return {
-          resources: filteredResources,
-          totalCount: filteredResources.length,
-        };
-      } catch (error) {
-        // Return empty results on error (fail-open approach)
-        // Log error (console not available in this environment)
-        return {
-          resources: [],
-          totalCount: 0,
-        };
-      }
-    });
+      const response = await this.fetchPage(searchUrl);
+      const html = await response.text();
+      
+      const filteredResources = await this.parseFilteredResources(html, criteria);
+      
+      return {
+        resources: filteredResources,
+        totalCount: filteredResources.length,
+      };
+    } catch (error) {
+      // Return empty results on error (fail-open approach)
+      return {
+        resources: [],
+        totalCount: 0,
+      };
+    }
   }
   
   async getByLocation(
@@ -118,34 +107,29 @@ class ResourceScraper extends BaseScraper {
       throw new ScraperError('Country cannot be empty', ERROR_CODES.INVALID_INPUT, false);
     }
     
-    const locationKey = `loc:${country}${state ? `:${state}` : ''}${county ? `:${county}` : ''}${city ? `:${city}` : ''}`;
-    const ttl = 7 * 24 * 60 * 60; // 7 days
+    await this.delay(1000); // Respectful delay
     
-    return this.fetchWithCache(locationKey, ttl, async () => {
-      await this.delay(1000); // Respectful delay
+    try {
+      // Build location-based URL
+      const locationUrl = this.buildLocationUrl(country, state, county, city);
+      const response = await this.fetchPage(locationUrl);
+      const html = await response.text();
       
-      try {
-        // Build location-based URL
-        const locationUrl = this.buildLocationUrl(country, state, county, city);
-        const response = await this.fetchPage(locationUrl);
-        const html = await response.text();
-        
-        const resources = await this.parseLocationResources(html, country, state, county, city);
-        
-        return {
-          resources,
-          totalCount: resources.length,
-        };
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new ScraperError(
-            `Failed to fetch location resources: ${error.message}`,
-            ERROR_CODES.NETWORK_ERROR
-          );
-        }
-        throw error;
+      const resources = await this.parseLocationResources(html, country, state, county, city);
+      
+      return {
+        resources,
+        totalCount: resources.length,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new ScraperError(
+          `Failed to fetch location resources: ${error.message}`,
+          ERROR_CODES.NETWORK_ERROR
+        );
       }
-    });
+      throw error;
+    }
   }
   
   private async parseResourceDetails(html: string, url: string, resourceId: string): Promise<GenealogyResource> {
@@ -474,18 +458,4 @@ class ResourceScraper extends BaseScraper {
            text.includes('electronic') || text.includes('scanned');
   }
   
-  private hashString(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36);
-  }
-  
-  private hashObject(obj: any): string {
-    const str = JSON.stringify(obj, Object.keys(obj).sort());
-    return this.hashString(str);
-  }
 }
