@@ -10,6 +10,7 @@ A simplified Model Context Protocol (MCP) server that provides genealogy resourc
 - **Filter Resources**: Filter resources by multiple criteria (location, type, language, etc.)
 - **Location-based Resources**: Find resources specific to geographic locations
 - **HTTP Streaming**: Modern HTTP streaming transport for better performance
+- **Authentication Support**: Optional Bearer token authentication to secure server access
 - **Simplified Architecture**: Clean design without caching or rate limiting complexity
 
 ## Architecture
@@ -42,9 +43,24 @@ This MCP server is built with:
    ```
 
 2. **Authenticate with Cloudflare**
+   Before deploying to Cloudflare Workers, you must authenticate Wrangler with your Cloudflare account. This is a one-time setup per machine.
+   
    ```bash
    wrangler login
    ```
+   
+   This command will:
+   - Open your default web browser
+   - Redirect you to Cloudflare's authentication page
+   - Prompt you to log in to your Cloudflare account
+   - Grant Wrangler permission to manage your Workers
+   
+   **Verify your authentication:**
+   ```bash
+   wrangler whoami
+   ```
+   
+   This should display your Cloudflare account email and account ID. If you see an error, repeat the login process.
 
 3. **Deploy**
    ```bash
@@ -71,6 +87,51 @@ Run the development server locally:
 npm run dev
 ```
 
+## Authentication
+
+The CLG-MCP server now supports optional Bearer token authentication to secure access to genealogy resources. Authentication is **optional** and **backward compatible** - if no authentication tokens are configured, the server operates in public access mode.
+
+### Quick Setup
+
+1. **Generate a secure token**:
+   ```bash
+   # Using openssl
+   openssl rand -hex 32
+   
+   # Using Node.js
+   node -e "console.log('mcp_sk_prod_' + require('crypto').randomBytes(24).toString('hex'))"
+   ```
+
+2. **Configure authentication** via Wrangler secrets (recommended):
+   ```bash
+   # Single token
+   wrangler secret put MCP_AUTH_TOKEN
+   
+   # Multiple tokens (comma-separated)
+   wrangler secret put MCP_AUTH_TOKENS
+   ```
+
+3. **Test authentication**:
+   ```bash
+   npm run test:auth
+   ```
+
+### Usage
+
+When authentication is enabled, clients must include the Bearer token in the Authorization header:
+
+```http
+Authorization: Bearer your_secret_token_here
+```
+
+### Authentication Options
+
+- **Single Token**: Set `MCP_AUTH_TOKEN` environment variable
+- **Multiple Tokens**: Set `MCP_AUTH_TOKENS` with comma-separated values
+- **No Authentication**: Leave both unset for public access mode
+
+For detailed authentication setup, security best practices, and troubleshooting, see [`AUTHENTICATION.md`](AUTHENTICATION.md).
+
 ## Cloudflare Account Setup
 
 ### Getting Started with Cloudflare
@@ -95,6 +156,48 @@ This simplified MCP server is optimized to work well within these limits.
 
 ## MCP Client Configuration
 
+### GitHub Copilot VS Code Extension
+
+1. **Install the GitHub Copilot VS Code Extension**
+   - Open Visual Studio Code
+   - Go to Extensions (Ctrl+Shift+X or Cmd+Shift+X)
+   - Search for "GitHub Copilot" and install it
+   - Sign in with your GitHub account that has Copilot access
+
+2. **Configure MCP Server Connection**
+   - Open VS Code Settings (File → Preferences → Settings)
+   - Search for "GitHub Copilot MCP"
+   - Add a new MCP server configuration:
+     - **Server Name**: `clg-mcp`
+     - **Server URL**: `https://your-worker-name.your-subdomain.workers.dev`
+     - **Transport Type**: `http`
+     - **Authorization**: `Bearer your_token_here` (if authentication is enabled)
+
+3. **Alternative Configuration via settings.json**
+   Add to your VS Code `settings.json`:
+   ```json
+   {
+     "github.copilot.mcp.servers": {
+       "clg-mcp": {
+         "url": "https://your-worker-name.your-subdomain.workers.dev",
+         "transport": {
+           "type": "http"
+         },
+         "headers": {
+           "Authorization": "Bearer your_token_here"
+         }
+       }
+     }
+   }
+   ```
+   
+   **Note**: Only include the `headers` section if authentication is enabled on your server.
+
+4. **Verify Connection**
+   - Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P)
+   - Run "GitHub Copilot: Show MCP Servers"
+   - Verify that `clg-mcp` appears in the list with a connected status
+
 ### Claude Desktop
 
 Add to your `claude_desktop_config.json`:
@@ -108,25 +211,57 @@ Add to your `claude_desktop_config.json`:
       "env": {},
       "transport": {
         "type": "http",
-        "url": "https://your-worker-name.your-subdomain.workers.dev"
+        "url": "https://your-worker-name.your-subdomain.workers.dev",
+        "headers": {
+          "Authorization": "Bearer your_token_here"
+        }
       }
     }
   }
 }
 ```
 
+**Note**: Only include the `headers` section if authentication is enabled on your server.
+
 **Configuration file locations:**
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-### Cline (VS Code Extension)
+### Kilo Code (VS Code Extension)
 
-1. Open VS Code Settings
-2. Go to Extensions → Cline → MCP Servers
-3. Add new server:
-   - **Name**: `Cyndi's List Genealogy`
-   - **URL**: `https://your-worker-name.your-subdomain.workers.dev`
-   - **Type**: `http`
+1. **Install Kilo Code Extension**
+   - Open Visual Studio Code
+   - Go to Extensions (Ctrl+Shift+X or Cmd+Shift+X)
+   - Search for "Kilo Code" and install it
+
+2. **Configure MCP Server**
+   - Open VS Code Settings (File → Preferences → Settings)
+   - Go to Extensions → Kilo Code → MCP Servers
+   - Add new server:
+     - **Name**: `Cyndi's List Genealogy`
+     - **URL**: `https://your-worker-name.your-subdomain.workers.dev`
+     - **Transport Type**: `http`
+     - **Authorization Header**: `Bearer your_token_here` (if authentication is enabled)
+
+3. **Alternative Configuration**
+   Add to your Kilo Code configuration file:
+   ```json
+   {
+     "mcpServers": {
+       "clg-mcp": {
+         "transport": {
+           "type": "http",
+           "url": "https://your-worker-name.your-subdomain.workers.dev",
+           "headers": {
+             "Authorization": "Bearer your_token_here"
+           }
+         }
+       }
+     }
+   }
+   ```
+   
+   **Note**: Only include the `headers` section if authentication is enabled on your server.
 
 ### Custom MCP Clients
 
@@ -259,6 +394,7 @@ clg-mcp/
 - `npm run dev` - Run development server locally
 - `npm run deploy` - Deploy to Cloudflare Workers
 - `npm run test:connection` - Test server connectivity and functionality
+- `npm run test:auth` - Test authentication functionality
 - `npm run lint` - Check code style and errors
 - `npm run format` - Format code with prettier
 
@@ -313,6 +449,12 @@ curl https://your-worker-name.your-subdomain.workers.dev/health
 curl -X POST https://your-worker-name.your-subdomain.workers.dev \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+
+# Test with authentication (if enabled)
+curl -X POST https://your-worker-name.your-subdomain.workers.dev \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_token_here" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
 ### Getting Help

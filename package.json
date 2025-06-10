@@ -11,6 +11,7 @@
     "deploy:full": "tsx scripts/deploy.ts",
     "deploy:dev": "tsx scripts/deploy.ts --dev",
     "test:connection": "tsx scripts/test-connection.ts",
+    "test:auth": "tsx scripts/test-auth.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint src --ext .ts",
     "setup": "npm install && npm run build",

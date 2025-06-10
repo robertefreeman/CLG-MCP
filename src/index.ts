@@ -8,6 +8,7 @@ import {
   handleFilterResources as filterResourcesTool,
   handleGetLocationResources as getLocationResourcesTool
 } from './mcp/tools';
+import { authenticateRequestMultiKey, createUnauthorizedResponse } from './utils/auth';
 
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
@@ -17,7 +18,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
     }
@@ -70,6 +71,12 @@ export default {
       return new Response('Method not allowed', { status: 405 });
     }
 
+    // Authenticate the request for MCP operations
+    const auth = authenticateRequestMultiKey(request, env);
+    if (!auth.isAuthenticated) {
+      return createUnauthorizedResponse(auth.error);
+    }
+
     // Set up HTTP streaming response headers
     const headers = new Headers({
       'Content-Type': 'application/json',
@@ -80,9 +87,9 @@ export default {
     // Handle the request and return direct JSON response
     try {
       const response = await handleMCPRequest(request, env);
-      return new Response(JSON.stringify(response), { 
+      return new Response(JSON.stringify(response), {
         headers,
-        status: 200 
+        status: 200
       });
     } catch (error) {
       const errorResponse: MCPResponse = {
@@ -94,9 +101,9 @@ export default {
         },
       };
       
-      return new Response(JSON.stringify(errorResponse), { 
+      return new Response(JSON.stringify(errorResponse), {
         headers,
-        status: 500 
+        status: 500
       });
     }
   },

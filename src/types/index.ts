@@ -104,4 +104,7 @@ export interface Env {
   MAX_SEARCH_RESULTS?: string;
   MCP_PROTOCOL_VERSION?: string;
   USER_AGENT?: string;
+  // Authentication
+  MCP_AUTH_TOKEN?: string;
+  MCP_AUTH_TOKENS?: string;
 }
