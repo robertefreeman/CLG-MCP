@@ -1,8 +1,15 @@
 # CLG-MCP: Cyndi's List Genealogy MCP Server Architecture
 
+This document provides detailed architectural information for the CLG-MCP server. For general usage, see [`README.md`](README.md). For deployment instructions, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## Overview
 
-The CLG-MCP (Cyndi's List Genealogy - Model Context Protocol) server is a remote SSE-based MCP server hosted on Cloudflare Workers (free tier), providing comprehensive genealogy resource discovery capabilities through web scraping of Cyndi's List.
+The CLG-MCP (Cyndi's List Genealogy - Model Context Protocol) server is a simplified HTTP-based MCP server hosted on Cloudflare Workers (free tier), providing genealogy resource discovery capabilities through web scraping of Cyndi's List.
+
+**Key Design Decisions:**
+- **Simplified Architecture**: No caching or KV dependencies for easier deployment
+- **HTTP Streaming**: Direct HTTP transport instead of SSE for better client compatibility
+- **Free Tier Optimized**: Designed to work efficiently within Cloudflare's free tier limits
 
 ## Architecture Design
 
@@ -16,8 +23,7 @@ graph TB
     end
     
     subgraph "Cloudflare Free Tier"
-        WORKER[Cloudflare Worker<br/>MCP Server<br/>100k req/day]
-        KV[(Cloudflare KV<br/>Cache & Rate Limiting<br/>100k reads/day<br/>1k writes/day)]
+        WORKER[Cloudflare Worker<br/>MCP Server<br/>100k req/day<br/>HTTP Streaming]
     end
     
     subgraph "External Resources"
@@ -25,56 +31,56 @@ graph TB
     end
     
     LLM --> MCP_CLIENT
-    MCP_CLIENT -.->|SSE Connection| WORKER
-    WORKER -->|Cache Check<br/>Rate Limit Check| KV
-    WORKER -->|Web Scraping<br/>(on cache miss)| CYNDIS
+    MCP_CLIENT -.->|HTTP Streaming| WORKER
+    WORKER -->|Direct Web Scraping<br/>with Respectful Delays| CYNDIS
     
     style WORKER fill:#f9f,stroke:#333,stroke-width:4px
-    style KV fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 ### Free Tier Constraints & Solutions
 
 | Resource | Free Tier Limit | Our Strategy |
 |----------|-----------------|--------------|
-| Worker Requests | 100,000/day | Aggressive caching, request coalescing |
+| Worker Requests | 100,000/day | Respectful delays, efficient request handling |
 | CPU Time | 10ms per request | Efficient parsing, minimal processing |
-| KV Reads | 100,000/day | Long cache TTLs, smart key design |
-| KV Writes | 1,000/day | Extended cache durations, write batching |
-| KV Storage | 1GB | Compress cached data, selective caching |
+| Workers per Account | 10 workers | Single optimized worker for all environments |
+| Memory Usage | 128MB | Minimal memory footprint, no persistent state |
 
 ## Project Structure
 
 ```
 clg-mcp/
 ├── src/
-│   ├── index.ts              # Main MCP server entry point
+│   ├── index.ts              # Main MCP server entry point and request handler
 │   ├── mcp/
-│   │   ├── server.ts         # MCP server setup
-│   │   └── tools.ts          # Tool definitions
+│   │   ├── server.ts         # MCP server class and tool definitions
+│   │   └── tools.ts          # Tool implementation handlers
 │   ├── scrapers/
-│   │   ├── base.ts           # Base scraper with caching
+│   │   ├── base.ts           # Base scraper with common functionality
 │   │   ├── categories.ts     # Category hierarchy scraper
 │   │   ├── search.ts         # Search functionality
 │   │   └── resources.ts      # Resource details scraper
-│   ├── cache/
-│   │   ├── manager.ts        # Cache management
-│   │   ├── strategies.ts     # Cache strategies
-│   │   └── keys.ts           # Cache key generation
-│   ├── rateLimit/
-│   │   └── kvLimiter.ts      # KV-based rate limiting
 │   ├── utils/
-│   │   ├── compress.ts       # Data compression
-│   │   ├── parser.ts         # HTML parsing utilities
-│   │   └── errors.ts         # Error handling
+│   │   ├── auth.ts           # Authentication utilities
+│   │   ├── errors.ts         # Error handling utilities
+│   │   └── htmlParser.ts     # HTML parsing utilities
 │   └── types/
-│       └── index.ts          # TypeScript interfaces
-├── wrangler.toml             # Cloudflare Worker config
-├── package.json
-├── tsconfig.json
+│       └── index.ts          # TypeScript interfaces and types
 ├── scripts/
-│   └── prebuild-cache.ts     # Pre-cache static data
-└── README.md
+│   ├── deploy.ts             # Automated deployment script
+│   ├── test-connection.ts    # Connection testing script
+│   ├── test-auth.ts          # Authentication testing script
+│   ├── test-connection.ts    # Connection testing script
+│   └── diagnose-connection.ts # Connection diagnostics script
+├── wrangler.toml             # Cloudflare Worker configuration
+├── package.json              # Project dependencies and scripts
+├── tsconfig.json             # TypeScript configuration
+├── .env.example              # Environment variables template
+├── example-client-config.json # MCP client configuration examples
+├── README.md                 # Main documentation
+├── DEPLOYMENT.md             # Detailed deployment guide
+├── AUTHENTICATION.md         # Authentication setup and security
+└── kilocode-setup-guide.md   # KiloCode extension setup guide
 ```
 
 ## MCP Tools Specification
@@ -242,79 +248,30 @@ Get resources specific to a geographic location.
 }
 ```
 
-## Caching Strategy
+## Simplified Architecture Benefits
 
-### Cache Durations (Optimized for Free Tier)
+### No Caching Layer
+
+The current implementation deliberately avoids caching for several reasons:
+
+1. **Simplified Deployment**: No KV namespace setup required
+2. **Reduced Complexity**: Cleaner codebase without cache management
+3. **Better Compatibility**: Direct HTTP responses work with all MCP clients
+4. **Easier Debugging**: No cache-related issues to troubleshoot
+5. **Respectful by Design**: Built-in delays ensure responsible scraping
+
+### Built-in Rate Limiting
+
+Instead of KV-based rate limiting, the server uses:
 
 ```typescript
-const CACHE_DURATIONS = {
-  // Static content (rarely changes)
-  categories: 30 * 24 * 60 * 60,        // 30 days
-  locationIndex: 30 * 24 * 60 * 60,     // 30 days
-  
-  // Semi-static content
-  resourceDetails: 14 * 24 * 60 * 60,   // 14 days
-  categoryResources: 7 * 24 * 60 * 60,  // 7 days
-  
-  // Dynamic content
-  searchResults: 3 * 24 * 60 * 60,      // 3 days
-  
-  // Rate limiting
-  rateLimit: 60,                        // 1 minute
+// Built-in delays for respectful scraping
+const SCRAPING_DELAYS = {
+  search: 1000,     // 1 second between search requests
+  categories: 800,  // 800ms between category requests
+  resources: 1000,  // 1 second between resource requests
+  filters: 1200,    // 1.2 seconds between filter requests
 };
-```
-
-### Cache Key Strategy
-
-```typescript
-const CACHE_KEYS = {
-  // Hierarchical key structure to optimize KV operations
-  category: (id: string) => `cat:${id}`,
-  categoryList: () => `cat:_list`,
-  search: (query: string, filters: string) => `srch:${hash(query)}:${hash(filters)}`,
-  resource: (id: string) => `res:${id}`,
-  location: (country: string, state?: string) => `loc:${country}${state ? `:${state}` : ''}`,
-  rateLimit: (ip: string, minute: number) => `rl:${ip}:${minute}`,
-};
-```
-
-### Cache Optimization Techniques
-
-1. **Response Compression**: Compress all cached data using gzip
-2. **Selective Caching**: Only cache essential fields
-3. **Cache Warming**: Pre-cache popular categories and locations
-4. **Stale-While-Revalidate**: Serve stale content while updating
-
-## Rate Limiting Implementation
-
-```typescript
-class KVRateLimiter {
-  constructor(private env: Env) {}
-
-  async checkLimit(clientIp: string): Promise<boolean> {
-    const minute = Math.floor(Date.now() / 60000);
-    const key = CACHE_KEYS.rateLimit(clientIp, minute);
-    
-    try {
-      const count = await this.env.CACHE.get(key);
-      if (count && parseInt(count) >= 30) { // 30 requests per minute
-        return false;
-      }
-      
-      // Increment counter
-      await this.env.CACHE.put(
-        key, 
-        String((parseInt(count || '0') + 1)),
-        { expirationTtl: 120 } // 2 minute TTL
-      );
-      
-      return true;
-    } catch (error) {
-      // On error, allow request (fail open)
-      return true;
-    }
-  }
-}
 ```
 
 ## Web Scraping Strategy
@@ -370,58 +327,68 @@ const ERROR_STRATEGIES = {
 name = "clg-mcp"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+workers_dev = true
 
 [build]
 command = "npm run build"
 
+# Production environment
 [env.production]
-kv_namespaces = [
-  { binding = "CACHE", id = "your-kv-namespace-id" }
-]
+name = "clg-mcp"
 
-# Free tier limits
-[limits]
-cpu_ms = 10
+[env.production.vars]
+DEBUG_MODE = "false"
+ENVIRONMENT = "production"
+MCP_SERVER_NAME = "clg-mcp"
+MCP_SERVER_VERSION = "1.0.0"
+REQUEST_TIMEOUT = "30000"
+MAX_SEARCH_RESULTS = "50"
+MCP_PROTOCOL_VERSION = "2024-11-05"
 
-[triggers]
-crons = ["0 0 * * *"] # Daily cache warming
+# Development environment
+[env.development]
+name = "clg-mcp-dev"
 ```
+
+See [`wrangler.toml`](wrangler.toml) for the complete configuration.
 
 ### Environment Variables
 
 ```bash
-# No API keys needed for Cyndi's List scraping
+# Authentication (optional)
+MCP_AUTH_TOKEN=your_secret_token
+MCP_AUTH_TOKENS=token1,token2,token3
+
 # Optional configuration
-CACHE_ENABLED=true
-RATE_LIMIT_ENABLED=true
 DEBUG_MODE=false
+REQUEST_TIMEOUT=30000
+MAX_SEARCH_RESULTS=50
 ```
+
+See [`.env.example`](.env.example) for complete environment variable documentation.
 
 ### Deployment Steps
 
-1. **Create KV Namespace**
+1. **Automated Deployment (Recommended)**
    ```bash
-   wrangler kv:namespace create "CACHE"
+   npm run setup
+   wrangler login
+   npm run deploy:full
    ```
 
-2. **Build and Deploy**
+2. **Manual Deployment**
    ```bash
    npm install
    npm run build
-   wrangler publish
+   npm run deploy
    ```
 
-3. **Configure MCP Client**
-   ```json
-   {
-     "mcpServers": {
-       "clg-mcp": {
-         "url": "https://clg-mcp.{your-subdomain}.workers.dev",
-         "timeout": 30
-       }
-     }
-   }
+3. **Test Deployment**
+   ```bash
+   npm run test:connection
    ```
+
+For detailed deployment instructions, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Performance Optimizations
 
@@ -472,11 +439,11 @@ async function trackUsage(env: Env, metric: string) {
 
 ### 1. Free Tier Limits
 
-**Challenge**: 100k requests/day, 1k KV writes/day
-**Mitigation**: 
-- 30-day cache for static content
-- Request coalescing
-- Serve stale content when limits reached
+**Challenge**: 100k requests/day, 10ms CPU time per request
+**Mitigation**:
+- Efficient request processing
+- Built-in delays for respectful scraping
+- Optimized HTML parsing
 
 ### 2. Website Structure Changes
 
@@ -496,37 +463,51 @@ async function trackUsage(env: Env, metric: string) {
 
 ### 4. Search Functionality
 
-**Challenge**: No full-text search in KV
+**Challenge**: Limited search capabilities from external website
 **Mitigation**:
-- Cache search results by query
-- Use Cyndi's List search
+- Use Cyndi's List search directly
 - Implement query normalization
+- Provide efficient result filtering
 
 ## Future Enhancements
 
-1. **Upgrade Path**: When ready for paid tier ($5/month)
-   - Add Durable Objects for better rate limiting
-   - Implement R2 for search index
-   - Increase cache sizes
+1. **Performance Optimizations**:
+   - Add intelligent caching layer when needed
+   - Implement request batching
+   - Optimize scraping patterns
 
 2. **Feature Additions**:
-   - User bookmarks (using KV prefix)
-   - Search history
+   - Enhanced search filters
    - Resource recommendations
+   - Search result ranking
 
 3. **Integration Options**:
    - FamilySearch API integration
    - Ancestry.com public records
    - FindAGrave connections
 
+4. **Upgrade Path**: When ready for paid tier
+   - Add Durable Objects for advanced features
+   - Implement R2 for data storage
+   - Enhanced monitoring and analytics
+
 ## Conclusion
 
-This architecture provides a robust, scalable MCP server for genealogy resource discovery while staying within Cloudflare's free tier limits. The aggressive caching strategy and efficient request handling ensure good performance despite the constraints.
+This simplified architecture provides a robust, easy-to-deploy MCP server for genealogy resource discovery while staying within Cloudflare's free tier limits. The elimination of caching complexity makes it much easier to deploy and maintain.
 
 Key benefits:
-- Zero infrastructure cost
-- Global edge deployment
-- Automatic scaling
-- No server maintenance
+- **Zero infrastructure cost** - Uses Cloudflare's free tier
+- **Global edge deployment** - Fast response times worldwide
+- **Automatic scaling** - Handles traffic spikes automatically
+- **No server maintenance** - Serverless architecture
+- **Simple deployment** - No KV namespace setup required
+- **Better compatibility** - HTTP transport works with all MCP clients
 
-The design is production-ready and can serve thousands of genealogy researchers daily within the free tier limits.
+The design is production-ready and can serve genealogy researchers daily within the free tier limits, with a clear upgrade path when more advanced features are needed.
+
+## Related Documentation
+
+- **[README.md](README.md)** - General project overview and setup
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** - Security and authentication setup
+- **[example-client-config.json](example-client-config.json)** - Client configuration examples

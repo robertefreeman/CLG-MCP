@@ -1,6 +1,6 @@
 # MCP Server Authentication
 
-This document describes the authentication mechanism implemented for the CLG-MCP server.
+This document describes the authentication mechanism implemented for the CLG-MCP server. For general setup information, see [`README.md`](README.md). For deployment details, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Overview
 
@@ -204,3 +204,50 @@ Update your MCP client configuration to include authentication:
     }
   }
 }
+
+## Testing Authentication
+
+Use the provided test script to verify authentication setup:
+
+```bash
+# Test authentication with your deployed server
+npm run test:auth
+
+# Or test with environment variables
+MCP_SERVER_URL=https://your-server.workers.dev MCP_AUTH_TOKEN=your_token npm run test:auth
+```
+
+The test script is located at [`scripts/test-auth.ts`](scripts/test-auth.ts) and provides comprehensive authentication testing.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **401 Unauthorized Errors**
+   - Verify token is correctly set in environment or client configuration
+   - Check token format (should not include "Bearer " prefix in environment variables)
+   - Ensure no extra whitespace in token values
+
+2. **Configuration Not Taking Effect**
+   - Restart your MCP client after configuration changes
+   - Verify configuration file syntax is valid JSON
+   - Check file permissions on configuration files
+
+3. **Development vs Production Tokens**
+   - Use different tokens for development and production environments
+   - Set tokens as Wrangler secrets, not in `wrangler.toml`
+   - Keep development tokens separate from production
+
+### Getting Help
+
+- **Connection Issues**: Run [`scripts/diagnose-connection.ts`](scripts/diagnose-connection.ts)
+- **Configuration Examples**: See [`example-client-config.json`](example-client-config.json)
+- **Deployment Problems**: Check [`DEPLOYMENT.md`](DEPLOYMENT.md)
+- **General Setup**: Refer to [`README.md`](README.md)
+
+## Related Documentation
+
+- **[README.md](README.md)** - General project setup and client configuration examples
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment guide including authentication secrets setup
+- **[example-client-config.json](example-client-config.json)** - Complete client configuration examples
+- **[scripts/test-auth.ts](scripts/test-auth.ts)** - Authentication testing script

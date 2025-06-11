@@ -162,15 +162,17 @@
   },
   "architecture_notes": {
     "transport": "HTTP Streaming",
-    "caching": "None - Direct HTTP requests every time",
-    "rate_limiting": "None - Built-in respectful delays only",
-    "deployment": "Cloudflare Workers (no KV required)",
+    "caching": "None - Direct HTTP requests every time for simplicity",
+    "rate_limiting": "Built-in respectful delays between requests",
+    "deployment": "Cloudflare Workers (no KV dependencies required)",
+    "authentication": "Optional Bearer token authentication",
     "benefits": [
       "Simplified deployment without KV namespace setup",
       "Better client compatibility with HTTP transport",
       "Cleaner codebase without caching complexity",
       "Respectful scraping with built-in delays",
-      "Direct error handling and responses"
+      "Direct error handling and clear responses",
+      "Optional authentication for security"
     ]
   },
   "troubleshooting": {
@@ -194,9 +196,18 @@
     ],
     "debugging": [
       "Use 'npm run test:connection' to verify server connectivity",
-      "Check Cloudflare Workers logs for server-side errors",
+      "Use 'npm run test:auth' to test authentication if enabled",
+      "Run 'npm run test:connection' for comprehensive connection diagnostics",
+      "Check Cloudflare Workers logs with 'wrangler tail'",
       "Test with curl commands to isolate client vs server issues",
       "Verify HTTP transport type in client configuration"
+    ],
+    "related_documentation": [
+      "README.md - General setup and client configuration examples",
+      "DEPLOYMENT.md - Complete deployment guide and troubleshooting",
+      "AUTHENTICATION.md - Authentication setup and security",
+      "clg-mcp-architecture.md - Detailed architecture documentation",
+      "kilocode-setup-guide.md - KiloCode extension specific setup"
     ]
   }
 }

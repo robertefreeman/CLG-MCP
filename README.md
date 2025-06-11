@@ -10,26 +10,38 @@ A simplified Model Context Protocol (MCP) server that provides genealogy resourc
 - **Filter Resources**: Filter resources by multiple criteria (location, type, language, etc.)
 - **Location-based Resources**: Find resources specific to geographic locations
 - **HTTP Streaming**: Modern HTTP streaming transport for better performance
+- **Server-Sent Events (SSE)**: Alternative streaming protocol for real-time communication
 - **Authentication Support**: Optional Bearer token authentication to secure server access
 - **Simplified Architecture**: Clean design without caching or rate limiting complexity
 
 ## Architecture
 
 This MCP server is built with:
-- **TypeScript** for type safety
-- **Cloudflare Workers** for serverless deployment
+- **TypeScript** for type safety and robust development
+- **Cloudflare Workers** for serverless deployment (optimized for free tier)
 - **HTTP Streaming** for MCP protocol communication
+- **Server-Sent Events (SSE)** for real-time streaming protocol support
 - **Web Scraping** of Cyndi's List genealogy resources
 - **Respectful delays** to ensure responsible scraping
+- **Simplified architecture** without caching or KV dependencies
+
+For detailed architectural information, see [`clg-mcp-architecture.md`](clg-mcp-architecture.md).
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 20.0.0 or higher (required by Wrangler CLI)
 - npm or yarn
 - Cloudflare account (free tier)
 - Wrangler CLI (`npm install -g wrangler`)
+
+**Important**: Wrangler requires Node.js v20.0.0 or higher. Check your version with:
+```bash
+node --version
+```
+
+If you need to update Node.js, visit [nodejs.org](https://nodejs.org) or use a version manager like [nvm](https://github.com/nvm-sh/nvm).
 
 ### Installation & Deployment
 
@@ -131,6 +143,49 @@ Authorization: Bearer your_secret_token_here
 - **No Authentication**: Leave both unset for public access mode
 
 For detailed authentication setup, security best practices, and troubleshooting, see [`AUTHENTICATION.md`](AUTHENTICATION.md).
+
+## Server-Sent Events (SSE) Protocol
+
+CLG-MCP now supports Server-Sent Events (SSE) as an alternative protocol alongside the standard JSON-RPC over HTTP. SSE provides persistent connections for real-time communication and can be useful for backward compatibility or specific client requirements.
+
+### SSE Features
+
+- **Persistent Connections**: Maintains long-lived connections for real-time updates
+- **Event Streaming**: Supports multiple event types (connections, responses, heartbeats)
+- **Backward Compatibility**: Works alongside existing JSON-RPC protocol
+- **Connection Management**: Automatic cleanup and heartbeat monitoring
+- **Authentication**: Full authentication support via Bearer tokens
+
+### Quick SSE Usage
+
+1. **Establish SSE Connection**:
+   ```bash
+   curl -H "Authorization: Bearer your_token" \
+        "https://your-worker.workers.dev/sse"
+   ```
+
+2. **Send MCP Requests via SSE**:
+   ```bash
+   curl -X POST \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer your_token" \
+        -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","protocol":"sse","connectionId":"conn_123"}' \
+        "https://your-worker.workers.dev/sse"
+   ```
+
+### SSE Endpoints
+
+- **GET `/sse`**: Establish SSE connection and receive real-time events
+- **POST `/sse`**: Send MCP requests over existing SSE connection
+- **GET `/health`**: Shows SSE statistics and connection info
+
+### Client Example
+
+See [`example-sse-client.html`](example-sse-client.html) for a complete working example of SSE client implementation.
+
+For detailed SSE setup, configuration, and usage guide, see [`SSE-GUIDE.md`](SSE-GUIDE.md).
+
+For complete deployment instructions including environment setup and troubleshooting, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Cloudflare Account Setup
 
@@ -265,7 +320,7 @@ Add to your `claude_desktop_config.json`:
 
 ### Custom MCP Clients
 
-See `example-client-config.json` for detailed configuration examples and usage patterns.
+See [`example-client-config.json`](example-client-config.json) for detailed configuration examples and usage patterns.
 
 ### Finding Your Worker URL
 
@@ -362,29 +417,40 @@ Get resources for a specific location.
 ```
 clg-mcp/
 ├── src/
-│   ├── index.ts              # Main MCP server entry point
+│   ├── index.ts              # Main MCP server entry point and request handler
 │   ├── mcp/
-│   │   ├── server.ts         # MCP server setup
-│   │   └── tools.ts          # Tool definitions and handlers
+│   │   ├── server.ts         # MCP server class and tool definitions
+│   │   ├── tools.ts          # Tool implementation handlers
+│   │   └── sse.ts            # Server-Sent Events protocol implementation
 │   ├── scrapers/
 │   │   ├── base.ts           # Base scraper with common functionality
 │   │   ├── categories.ts     # Category hierarchy scraper
 │   │   ├── search.ts         # Search functionality
 │   │   └── resources.ts      # Resource details scraper
 │   ├── utils/
-│   │   ├── errors.ts         # Error handling
+│   │   ├── auth.ts           # Authentication utilities
+│   │   ├── errors.ts         # Error handling utilities
 │   │   └── htmlParser.ts     # HTML parsing utilities
 │   └── types/
-│       └── index.ts          # TypeScript interfaces
+│       └── index.ts          # TypeScript interfaces and types
 ├── scripts/
 │   ├── deploy.ts             # Automated deployment script
-│   └── test-connection.ts    # Connection testing script
-├── wrangler.toml             # Cloudflare Worker config
-├── package.json
-├── tsconfig.json
+│   ├── test-connection.ts    # Connection testing script
+│   ├── test-auth.ts          # Authentication testing script
+│   ├── test-connection.ts    # Connection testing script
+│   └── diagnose-connection.ts # Connection diagnostics script
+├── wrangler.toml             # Cloudflare Worker configuration
+├── package.json              # Project dependencies and scripts
+├── tsconfig.json             # TypeScript configuration
 ├── .env.example              # Environment variables template
 ├── example-client-config.json # MCP client configuration examples
-└── README.md
+├── example-sse-client.html   # SSE client example (browser-based)
+├── README.md                 # Main documentation (this file)
+├── DEPLOYMENT.md             # Detailed deployment guide
+├── AUTHENTICATION.md         # Authentication setup and security
+├── SSE-GUIDE.md              # Server-Sent Events protocol guide
+├── clg-mcp-architecture.md   # Architectural documentation
+└── kilocode-setup-guide.md   # KiloCode extension setup guide
 ```
 
 ## Scripts
@@ -392,22 +458,28 @@ clg-mcp/
 - `npm run setup` - Install dependencies and build project
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run dev` - Run development server locally
-- `npm run deploy` - Deploy to Cloudflare Workers
+- `npm run deploy` - Deploy to Cloudflare Workers (basic)
+- `npm run deploy:full` - Full automated deployment with KV setup
+- `npm run deploy:dev` - Deploy to development environment
 - `npm run test:connection` - Test server connectivity and functionality
 - `npm run test:auth` - Test authentication functionality
 - `npm run lint` - Check code style and errors
 - `npm run format` - Format code with prettier
+- `npm run validate` - Run linting and build checks
 
 ## Simplified Architecture Benefits
 
-This refactored version provides several advantages:
+This simplified version provides several advantages:
 
 - **No KV Dependencies**: Eliminates the need for Cloudflare KV namespace setup
-- **Simplified Deployment**: Easier setup process without cache configuration
-- **HTTP Streaming**: Modern transport protocol for better compatibility
-- **Reduced Complexity**: Cleaner codebase without caching infrastructure
-- **Better Error Handling**: Direct HTTP responses instead of SSE complexity
+- **Simplified Deployment**: Easier setup process without complex cache configuration
+- **HTTP Streaming**: Modern transport protocol for better client compatibility
+- **Reduced Complexity**: Cleaner codebase without caching infrastructure overhead
+- **Better Error Handling**: Direct HTTP responses with clear error messages
 - **Respectful Scraping**: Built-in delays ensure responsible website access
+- **Free Tier Optimized**: Designed to work efficiently within Cloudflare's free tier limits
+
+For detailed architectural discussion and design decisions, see [`clg-mcp-architecture.md`](clg-mcp-architecture.md).
 
 ## Responsible Usage
 
@@ -459,10 +531,13 @@ curl -X POST https://your-worker-name.your-subdomain.workers.dev \
 
 ### Getting Help
 
-1. Check the Cloudflare Workers documentation
-2. Review the MCP protocol specification
-3. Look at `example-client-config.json` for configuration examples
-4. Check the issues section of this repository
+1. **Deployment Issues**: See [`DEPLOYMENT.md`](DEPLOYMENT.md) for comprehensive troubleshooting
+2. **Authentication Problems**: Check [`AUTHENTICATION.md`](AUTHENTICATION.md) for setup guidance
+3. **Connection Issues**: Run [`scripts/diagnose-connection.ts`](scripts/diagnose-connection.ts) for diagnostics
+4. **Configuration Examples**: Review [`example-client-config.json`](example-client-config.json)
+5. **Architecture Questions**: Consult [`clg-mcp-architecture.md`](clg-mcp-architecture.md)
+6. Check the Cloudflare Workers documentation
+7. Review the MCP protocol specification at https://spec.modelcontextprotocol.io/
 
 ## Environment Configuration
 
@@ -493,4 +568,16 @@ This tool is for educational and research purposes. Please respect Cyndi's List'
 
 ---
 
-**Need help?** Check out `example-client-config.json` for detailed setup examples and troubleshooting tips.
+## Related Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide with troubleshooting
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** - Security setup and authentication configuration
+- **[SSE-GUIDE.md](SSE-GUIDE.md)** - Server-Sent Events protocol setup and usage guide
+- **[clg-mcp-architecture.md](clg-mcp-architecture.md)** - Detailed architecture and design decisions
+- **[kilocode-setup-guide.md](kilocode-setup-guide.md)** - Quick setup guide for KiloCode extension
+- **[example-client-config.json](example-client-config.json)** - Configuration examples for various MCP clients
+- **[example-sse-client.html](example-sse-client.html)** - Working SSE client example
+
+---
+
+**Need help?** Start with the appropriate documentation above, or check [`example-client-config.json`](example-client-config.json) for detailed setup examples and troubleshooting tips.

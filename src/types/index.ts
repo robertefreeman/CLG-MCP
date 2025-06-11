@@ -107,4 +107,40 @@ export interface Env {
   // Authentication
   MCP_AUTH_TOKEN?: string;
   MCP_AUTH_TOKENS?: string;
+  // SSE Configuration
+  SSE_ENABLED?: string;
+  SSE_HEARTBEAT_INTERVAL?: string;
+  SSE_MAX_CONNECTIONS?: string;
+}
+
+// SSE Types
+export interface SSEMessage {
+  id?: string;
+  event?: string;
+  data: string;
+  retry?: number;
+}
+
+export interface SSEConnection {
+  id: string;
+  controller: any; // ReadableStreamDefaultController in Cloudflare Workers
+  createdAt: number;
+  lastActivity: number;
+}
+
+export interface SSEResponse {
+  type: 'message' | 'error' | 'close';
+  data: any;
+  messageId?: string;
+}
+
+export interface MCPSSERequest extends MCPRequest {
+  protocol: 'sse';
+  connectionId?: string;
+}
+
+export interface MCPSSEResponse extends MCPResponse {
+  protocol: 'sse';
+  connectionId?: string;
+  timestamp?: number;
 }
